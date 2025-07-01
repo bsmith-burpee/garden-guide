@@ -93,17 +93,17 @@ export default async function RecipePage({ params }: RecipePageProps) {
           {/* Ingredients Sidebar */}
           <div className="lg:col-span-1">
             {recipeIngredients && recipeIngredients.length > 0 && (
-              <div className="bg-faded-green rounded-lg p-6 sticky top-4">
+              <div className="bg-faded-green rounded-lg p-6 sticky top-20">
                 <h2 className="text-xl font-medium text-gray-900 mb-4 font-reckless">Ingredients</h2>
                 <ul className="space-y-2">
                   {recipeIngredients.map((ingredient: any, index: number) => (
                     <li key={index} className="flex items-start">
                       <span className="text-brand-green mr-2">•</span>
-                      <span>
+                      <span className="text-gray-900">
                         {ingredient.fields?.amount && (
-                          <span className="font-medium">{ingredient.fields.amount} </span>
+                          <span className="font-medium text-gray-900">{ingredient.fields.amount} </span>
                         )}
-                        {ingredient.fields?.ingredientName}
+                        <span className="text-gray-900">{ingredient.fields?.ingredientName}</span>
                       </span>
                     </li>
                   ))}
