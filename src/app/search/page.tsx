@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import SearchInput from '@/components/SearchInput'
 import SearchResults from '@/components/SearchResults'
 
-export default function SearchPage() {
+function SearchPageContent() {
   const searchParams = useSearchParams()
   const initialQuery = searchParams.get('q') || ''
   const initialType = searchParams.get('type') || 'all'
@@ -131,5 +131,44 @@ export default function SearchPage() {
         />
       </div>
     </div>
+  )
+}
+
+function SearchPageLoading() {
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="bg-brand-gray border-b">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <h1 className="text-3xl font-medium text-gray-900 mb-6 font-reckless">Search</h1>
+          <div className="animate-pulse">
+            <div className="h-10 bg-gray-200 rounded-lg mb-6"></div>
+            <div className="flex gap-2">
+              <div className="h-8 w-24 bg-gray-200 rounded-lg"></div>
+              <div className="h-8 w-28 bg-gray-200 rounded-lg"></div>
+              <div className="h-8 w-26 bg-gray-200 rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-12">
+          <div className="inline-flex items-center px-6 py-3 text-brand-green">
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading search...
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchPageLoading />}>
+      <SearchPageContent />
+    </Suspense>
   )
 }
