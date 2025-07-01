@@ -37,14 +37,33 @@ export default function Header() {
             >
               Products
             </Link>
+            <Link 
+              href="/search" 
+              className="text-gray-700 hover:text-brand-green font-medium transition-colors flex items-center"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span className="ml-1">Search</span>
+            </Link>
           </nav>
 
-          {/* Mobile menu button */}
-          <button className="md:hidden p-2 rounded-md text-gray-700 hover:text-brand-green">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+          {/* Mobile search and menu */}
+          <div className="md:hidden flex items-center space-x-2">
+            <Link 
+              href="/search"
+              className="p-2 rounded-md text-gray-700 hover:text-brand-green"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </Link>
+            <button className="p-2 rounded-md text-gray-700 hover:text-brand-green">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </header>
