@@ -5,7 +5,7 @@ export const metadata = {
 
 export default function ProductsPage() {
   return (
-    <div className="min-h-screen bg-brand-gray">
+    <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -33,13 +33,13 @@ export default function ProductsPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
               href="/articles"
-              className="bg-brand-green text-white px-8 py-3 rounded-lg font-semibold hover:bg-brand-green/90 transition-colors"
+              className="border-2 border-brand-green text-brand-green bg-white px-8 py-3 rounded-lg font-semibold hover:bg-brand-green hover:text-white transition-colors shadow-sm"
             >
               Read Garden Articles
             </a>
             <a
               href="/recipes"
-              className="border-2 border-brand-green text-brand-green px-8 py-3 rounded-lg font-semibold hover:bg-brand-green hover:text-white transition-colors"
+              className="border-2 border-brand-green text-brand-green bg-white px-8 py-3 rounded-lg font-semibold hover:bg-brand-green hover:text-white transition-colors shadow-sm"
             >
               Try Garden Recipes
             </a>
