@@ -4,6 +4,91 @@ import { Document } from '@contentful/rich-text-types'
 import Image from 'next/image'
 import Link from 'next/link'
 
+// Function to detect and parse markdown tables
+function parseMarkdownTable(text: string): { isTable: boolean; tableData?: any; remainingText?: string } {
+  // More comprehensive regex that handles tables with or without trailing newlines
+  const tableRegex = /\|.*\|\s*\n\|[\s\-\|]*\|\s*\n(\|.*\|\s*(?:\n|$))*/g
+  const match = tableRegex.exec(text)
+  
+  if (!match) {
+    return { isTable: false }
+  }
+
+  const tableText = match[0]
+  const lines = tableText.trim().split('\n')
+  
+  if (lines.length < 3) {
+    return { isTable: false }
+  }
+
+  // Parse header
+  const headerLine = lines[0]
+  const headerCells = headerLine.split('|').map(h => h.trim())
+  // Remove first and last empty cells (from leading/trailing |)
+  if (headerCells[0] === '') headerCells.shift()
+  if (headerCells[headerCells.length - 1] === '') headerCells.pop()
+  const headers = headerCells.filter(h => h)
+  
+  // Parse data rows (skip separator line)
+  const dataLines = lines.slice(2).filter(line => line.trim() && !line.match(/^[\|\s\-]*$/))
+  
+  // Also check if there are any table rows remaining in the text after our match
+  const remainingTableRows = text.split(tableText)[1]?.match(/^\|.*\|/gm) || []
+  
+  const allDataLines = [...dataLines, ...remainingTableRows]
+  
+  const rows = allDataLines.map(line => {
+    // Split by | and trim, but keep empty cells to maintain column alignment
+    const cells = line.split('|').map(cell => cell.trim())
+    // Remove first and last empty cells (from leading/trailing |)
+    if (cells[0] === '') cells.shift()
+    if (cells[cells.length - 1] === '') cells.pop()
+    return cells
+  })
+
+  // Calculate remaining text after removing table and any additional table rows
+  let cleanedText = text.replace(tableText, '')
+  remainingTableRows.forEach(row => {
+    cleanedText = cleanedText.replace(row, '')
+  })
+  
+  return {
+    isTable: true,
+    tableData: { headers, rows },
+    remainingText: cleanedText.trim()
+  }
+}
+
+// Component to render a markdown table as React elements
+function MarkdownTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+  return (
+    <div className="overflow-x-auto my-6">
+      <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-lg">
+        <thead className="bg-faded-green">
+          <tr>
+            {headers.map((header, i) => (
+              <th key={i} className="px-4 py-3 text-left text-sm font-medium text-gray-900 border-b border-gray-200">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {rows.map((row, i) => (
+            <tr key={i} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100`}>
+              {row.map((cell, j) => (
+                <td key={j} className="px-4 py-3 text-sm text-gray-700 border-b border-gray-200">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 interface RichTextRendererProps {
   document: Document
 }
@@ -18,9 +103,43 @@ const options = {
     ),
   },
   renderNode: {
-    [BLOCKS.PARAGRAPH]: (node: any, children: any) => (
-      <p className="mb-4 leading-relaxed text-gray-700">{children}</p>
-    ),
+    [BLOCKS.PARAGRAPH]: (node: any, children: any) => {
+      // Extract text content from the node to check for tables
+      // Handle both plain text and formatted text (links, etc.)
+      const textContent = node.content
+        ?.map((item: any) => {
+          if (item.nodeType === 'text') {
+            return item.value || ''
+          } else if (item.nodeType === 'hyperlink' && item.content) {
+            // Extract text from links for table parsing
+            return item.content.map((linkItem: any) => linkItem.value || '').join('')
+          }
+          return ''
+        })
+        .join('') || ''
+
+      // Check if this paragraph contains a markdown table
+      const tableResult = parseMarkdownTable(textContent)
+      
+      if (tableResult.isTable && tableResult.tableData) {
+        return (
+          <div>
+            <MarkdownTable 
+              headers={tableResult.tableData.headers} 
+              rows={tableResult.tableData.rows} 
+            />
+            {tableResult.remainingText && (
+              <p className="mb-4 leading-relaxed text-gray-700">
+                {tableResult.remainingText}
+              </p>
+            )}
+          </div>
+        )
+      }
+
+      // Default paragraph rendering
+      return <p className="mb-4 leading-relaxed text-gray-700">{children}</p>
+    },
     [BLOCKS.HEADING_1]: (node: any, children: any) => (
       <h1 className="text-4xl font-medium mb-6 text-gray-900 font-reckless">{children}</h1>
     ),
