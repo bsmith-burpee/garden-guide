@@ -1,4 +1,5 @@
 import { Client } from '@elastic/elasticsearch'
+import { parseSearchQuery, getTermSynonyms, type ParsedQuery } from './search-analyzer'
 
 // Create Elasticsearch client
 const client = new Client({
@@ -149,7 +150,114 @@ export async function bulkIndexDocuments(docs: SearchDocument[]): Promise<void> 
 }
 
 /**
- * Search documents using semantic search
+ * Build an intelligent Elasticsearch query based on parsed query analysis
+ */
+function buildIntelligentQuery(parsedQuery: ParsedQuery): any {
+  const { subjectTerms, actionTerms, otherTerms, originalQuery, queryType } = parsedQuery
+  
+  const shouldClauses = []
+  
+  // 1. SUBJECT TERM BOOSTING (Highest Priority)
+  if (subjectTerms.length > 0) {
+    subjectTerms.forEach(subject => {
+      const synonyms = getTermSynonyms(subject)
+      
+      // Exact phrase match in title (highest boost)
+      shouldClauses.push({
+        match_phrase: {
+          title: {
+            query: subject,
+            boost: 15
+          }
+        }
+      })
+      
+      // Subject in title with synonyms (high boost)
+      shouldClauses.push({
+        multi_match: {
+          query: synonyms.join(' '),
+          fields: ['title^10'],
+          type: 'best_fields',
+          operator: 'or'
+        }
+      })
+      
+      // Subject in content (medium-high boost)
+      shouldClauses.push({
+        multi_match: {
+          query: synonyms.join(' '),
+          fields: ['content^6', 'metaDescription^8'],
+          type: 'best_fields',
+          operator: 'or'
+        }
+      })
+      
+      // Exact subject phrase in content
+      shouldClauses.push({
+        match_phrase: {
+          content: {
+            query: subject,
+            boost: 8
+          }
+        }
+      })
+    })
+  }
+  
+  // 2. ACTION TERMS (Medium Priority)
+  if (actionTerms.length > 0) {
+    const actionQuery = actionTerms.join(' ')
+    
+    shouldClauses.push({
+      multi_match: {
+        query: actionQuery,
+        fields: ['title^4', 'content^2', 'metaDescription^3'],
+        type: 'best_fields',
+        fuzziness: 'AUTO'
+      }
+    })
+  }
+  
+  // 3. OTHER TERMS (Lower Priority)
+  if (otherTerms.length > 0) {
+    const otherQuery = otherTerms.join(' ')
+    
+    shouldClauses.push({
+      multi_match: {
+        query: otherQuery,
+        fields: ['title^2', 'content^1', 'metaDescription^1.5'],
+        type: 'best_fields',
+        fuzziness: 'AUTO'
+      }
+    })
+  }
+  
+  // 4. FALLBACK: Full query with standard boosting
+  shouldClauses.push({
+    multi_match: {
+      query: originalQuery,
+      fields: ['title^3', 'content^1', 'metaDescription^2'],
+      type: 'best_fields',
+      fuzziness: 'AUTO'
+    }
+  })
+  
+  // Adjust minimum_should_match based on query type
+  let minimumShouldMatch = 1
+  if (queryType === 'subject-focused' && subjectTerms.length > 0) {
+    minimumShouldMatch = 2 // Require at least subject match + one other
+  }
+  
+  return {
+    bool: {
+      should: shouldClauses,
+      minimum_should_match: minimumShouldMatch
+    }
+  }
+}
+
+/**
+ * Search documents using intelligent query analysis and subject boosting
  */
 export async function searchDocuments(
   query: string,
@@ -157,24 +265,25 @@ export async function searchDocuments(
   limit = 12
 ): Promise<SearchResponse> {
   try {
-    // Build the search query
+    // Parse the query to understand intent and subjects
+    const parsedQuery = parseSearchQuery(query)
+    
+    // Log query analysis for debugging
+    console.log('Search Query Analysis:', {
+      original: query,
+      subjects: parsedQuery.subjectTerms,
+      actions: parsedQuery.actionTerms,
+      type: parsedQuery.queryType,
+      primarySubject: parsedQuery.primarySubject
+    })
+    
+    // Build intelligent query
+    const intelligentQuery = buildIntelligentQuery(parsedQuery)
+    
+    // Build the search body
     const searchBody: any = {
       size: limit,
-      query: {
-        bool: {
-          should: [
-            {
-              multi_match: {
-                query: query,
-                fields: ['title^3', 'content^1', 'metaDescription^2'],
-                type: 'best_fields',
-                fuzziness: 'AUTO'
-              }
-            }
-          ],
-          minimum_should_match: 1
-        }
-      },
+      query: intelligentQuery,
       highlight: {
         fields: {
           title: {
@@ -188,6 +297,12 @@ export async function searchDocuments(
             post_tags: ['</mark>'],
             fragment_size: 150,
             number_of_fragments: 2
+          },
+          metaDescription: {
+            pre_tags: ['<mark>'],
+            post_tags: ['</mark>'],
+            fragment_size: 100,
+            number_of_fragments: 1
           }
         }
       },
@@ -199,9 +314,14 @@ export async function searchDocuments(
 
     // Add type filter if specified
     if (type && type !== 'all') {
-      searchBody.query.bool.filter = [
-        { term: { type: type } }
-      ]
+      searchBody.query = {
+        bool: {
+          must: [searchBody.query],
+          filter: [
+            { term: { type: type } }
+          ]
+        }
+      }
     }
 
     const response = await client.search({
