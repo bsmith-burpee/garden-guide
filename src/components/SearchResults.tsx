@@ -20,10 +20,17 @@ interface SearchResult {
     newSlug?: string
     body?: any
     featuredImage?: any
+    listImage?: any
     imageAlt?: string
     metaDescription?: string
   }
   contentType: string
+  _score?: number
+  _highlight?: {
+    title?: string[]
+    content?: string[]
+    metaDescription?: string[]
+  }
 }
 
 interface SearchResultsProps {
@@ -106,62 +113,63 @@ export default function SearchResults({ results, query, isLoading, total }: Sear
         {results.map((result) => {
           const slug = result.fields.newSlug || result.fields.slug
           const href = result.contentType === 'article' ? `/articles/${slug}` : `/recipes/${slug}`
-          const imageUrl = result.fields.featuredImage ? getImageUrl(result.fields.featuredImage) : null
+          const imageUrl = result.fields.listImage ? getImageUrl(result.fields.listImage) : null
           const contentType = result.contentType === 'article' ? 'Article' : 'Recipe'
           
-          // Extract plain text from rich text body for excerpt
-          let excerpt = result.fields.metaDescription || ''
-          if (!excerpt && result.fields.body && result.fields.body.content) {
-            const textNodes = result.fields.body.content
-              .filter((node: any) => node.nodeType === 'paragraph')
-              .slice(0, 2)
-              .map((node: any) => 
-                node.content
-                  ?.filter((content: any) => content.nodeType === 'text')
-                  .map((content: any) => content.value)
-                  .join('')
-              )
-              .filter(Boolean)
-              .join(' ')
-            
-            excerpt = textNodes.substring(0, 150) + (textNodes.length > 150 ? '...' : '')
+          // Use highlighted title if available, otherwise regular title
+          const displayTitle = result._highlight?.title?.[0] || result.fields.title
+          
+          // Use highlighted content or meta description for excerpt
+          let excerpt = ''
+          if (result._highlight?.content?.[0]) {
+            excerpt = result._highlight.content[0]
+          } else if (result._highlight?.metaDescription?.[0]) {
+            excerpt = result._highlight.metaDescription[0]
+          } else if (result.fields.metaDescription) {
+            excerpt = result.fields.metaDescription.substring(0, 150) + 
+              (result.fields.metaDescription.length > 150 ? '...' : '')
           }
 
           return (
             <Link key={result.sys.id} href={href} className="group">
-              <article className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+              <article className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-200 hover:border-brand-green">
                 {imageUrl && (
-                  <div className="relative h-48 w-full">
+                  <div className="relative h-40 w-full overflow-hidden bg-gray-100">
                     <Image
                       src={imageUrl}
                       alt={result.fields.imageAlt || result.fields.title}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-200"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   </div>
                 )}
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${
                       result.contentType === 'article' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-green-100 text-green-800'
+                        ? 'bg-brand-green text-white' 
+                        : 'bg-faded-green text-brand-green'
                     }`}>
                       {contentType}
                     </span>
-                    <time className="text-xs text-gray-500">
-                      {new Date(result.sys.updatedAt).toLocaleDateString()}
-                    </time>
+                    {result._score && (
+                      <div className="text-xs text-gray-400">
+                        Relevance: {Math.round(result._score * 10) / 10}
+                      </div>
+                    )}
                   </div>
                   
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 font-geograph group-hover:text-brand-green transition-colors">
-                    {result.fields.title}
-                  </h3>
+                  <h3 
+                    className="text-base font-bold text-gray-900 mb-2 line-clamp-3 font-geograph group-hover:text-brand-green transition-colors leading-tight"
+                    dangerouslySetInnerHTML={{ __html: displayTitle }}
+                  />
                   
                   {excerpt && (
-                    <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed">
-                      {excerpt}
-                    </p>
+                    <div 
+                      className="text-gray-600 text-xs line-clamp-2 leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: excerpt }}
+                    />
                   )}
                 </div>
               </article>
